@@ -37,12 +37,33 @@ byte *disk0;
 
 void init_disks()
 {
+   // try to allocate in PSRAM first, fallback to malloc if not available
    disk0 = (byte *)ps_malloc(LYNX_MAX_DISK_SIZE);
-   if(disk0 == NULL)Serial.println("Failed to allocate Disk Buffer memory");
+   if(disk0 == NULL) {
+           Serial.println("ps_malloc disk0 failed, trying malloc");
+           disk0 = (byte *)malloc(LYNX_MAX_DISK_SIZE);
+   }
+   if(disk0 == NULL) {
+           Serial.println("Failed to allocate Disk Buffer memory");
+   }
+
    disk_sect_buf = (byte *)ps_malloc(BYTES_PER_SECT);
-   if(disk_sect_buf == NULL)Serial.println("Failed to allocate Sector memory");
+   if(disk_sect_buf == NULL) {
+           Serial.println("ps_malloc disk_sect_buf failed, trying malloc");
+           disk_sect_buf = (byte *)malloc(BYTES_PER_SECT);
+   }
+   if(disk_sect_buf == NULL) {
+           Serial.println("Failed to allocate Sector memory");
+   }
+
    disk_track_buf = (byte *)ps_malloc(BYTES_PER_TRACK);
-   if(disk_track_buf == NULL)Serial.println("Failed to allocate Track memory");
+   if(disk_track_buf == NULL) {
+           Serial.println("ps_malloc disk_track_buf failed, trying malloc");
+           disk_track_buf = (byte *)malloc(BYTES_PER_TRACK);
+   }
+   if(disk_track_buf == NULL) {
+           Serial.println("Failed to allocate Track memory");
+   }
 
    reset_disk_vars();         
 }
@@ -62,14 +83,17 @@ void open_working_disk(int x)
   sprintf(lbl,"/jd%d.ldf",x);
 //  lhandle = SD.open("/jd"+ce+".ldf", FILE_READ);
   lhandle = SD.open(lbl, FILE_READ);
-  if(lhandle!=NULL)
-  {
-    if (lhandle.available())
-    {
-       lhandle.read(disk0,LYNX_MAX_DISK_SIZE);
-    }
-    lhandle.close();
-  }  
+        if(lhandle!=NULL)
+        {
+                if (lhandle.available())
+                {
+                         if(disk0!=NULL)
+                                         lhandle.read(disk0,LYNX_MAX_DISK_SIZE);
+                         else
+                                         Serial.println("open_working_disk: disk0 NULL, skipping read");
+                }
+                lhandle.close();
+        }  
   else
   {
     Serial.println("Error Opening Disk File");
@@ -83,9 +107,10 @@ void save_working_disk()
   lhandle = SD.open("/ldump.ldf", FILE_WRITE);
   if(lhandle!=NULL)
   {
-    {
-        lhandle.write(disk0,LYNX_MAX_DISK_SIZE);
-    }
+                if(disk0!=NULL)
+                                lhandle.write(disk0,LYNX_MAX_DISK_SIZE);
+                else
+                                Serial.println("save_working_disk: disk0 NULL, skipping write");
     lhandle.close();
   }  
   else
@@ -113,8 +138,12 @@ void do_disk_updates()
         
         if((last_command & 0xe0)==0xa0)  //we had a write sector last time - so write the sector buffer out
         {
-               for(int f = 0; f < BYTES_PER_SECT; f++)
-                    disk0[disk_head_to_write*BYTES_PER_SIDE + disk_track_to_write*BYTES_PER_TRACK+(disk_sect_to_write-1)*BYTES_PER_SECT+f] = disk_sect_buf[f];
+                                if(disk0!=NULL && disk_sect_buf!=NULL) {
+                                        for(int f = 0; f < BYTES_PER_SECT; f++)
+                                                disk0[disk_head_to_write*BYTES_PER_SIDE + disk_track_to_write*BYTES_PER_TRACK+(disk_sect_to_write-1)*BYTES_PER_SECT+f] = disk_sect_buf[f];
+                                } else {
+                                        Serial.println("do_disk_updates: disk buffers NULL, skipping write");
+                                }
                last_command=0;disk_comreg=0;
                disk_statusreg=0;
         }
@@ -207,8 +236,12 @@ void do_disk_command()
 //Serial.println("sector");
 //Serial.println((int)disk_sectreg);
 
-                for(int f = 0; f < BYTES_PER_SECT; f++)
-                    disk_sect_buf[f] = disk0[disk_head*BYTES_PER_SIDE + disk_trackreg*BYTES_PER_TRACK+(disk_sectreg-1)*BYTES_PER_SECT+f];
+                                if(disk_sect_buf!=NULL && disk0!=NULL) {
+                                        for(int f = 0; f < BYTES_PER_SECT; f++)
+                                                disk_sect_buf[f] = disk0[disk_head*BYTES_PER_SIDE + disk_trackreg*BYTES_PER_TRACK+(disk_sectreg-1)*BYTES_PER_SECT+f];
+                                } else {
+                                        Serial.println("do_disk_command: disk buffers NULL, skipping read sector");
+                                }
               
                 disk_statusreg=0;
                 disk_statusreg=disk_statusreg | 0x01;//set busy flag

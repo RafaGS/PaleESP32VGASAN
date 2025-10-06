@@ -13,6 +13,7 @@
 
 #include <bt.h>
 #include <esp_wifi.h>
+#include <esp_system.h>
 #include "PS2Kbd.h"
 #include <SPI.h>
 
@@ -134,13 +135,12 @@ bool run_debug = false;
   static fs::FS* fileSystem;
 #endif
 
-
-const int redPin = 22;    //was 27
-const int greenPin = 19;   //was 21
-const int bluePin = 5;    //was 14
+// Estos son los pines correctos
+const int redPin = 22; 
+const int greenPin = 19;
+const int bluePin = 5;  
 const int hsyncPin = 23;  
-const int vsyncPin = 15; // was 22
-
+const int vsyncPin = 15;
 
 // ____________________________________________________________________
 // INSTANTS
@@ -202,20 +202,44 @@ static unsigned long gb_keyboardTime;
 // SETUP *************************************
 
   
+void printResetReason()
+{
+  esp_reset_reason_t r = esp_reset_reason();
+  const char *s = "UNKNOWN";
+  switch (r) {
+    case ESP_RST_UNKNOWN: s = "UNKNOWN"; break;
+    case ESP_RST_POWERON: s = "POWERON"; break;
+    case ESP_RST_EXT: s = "EXTERNAL_RESET"; break;
+    case ESP_RST_SW: s = "SOFTWARE_RESET"; break;
+    case ESP_RST_PANIC: s = "PANIC"; break;
+    case ESP_RST_INT_WDT: s = "INT_WDT"; break;
+    case ESP_RST_TASK_WDT: s = "TASK_WDT"; break;
+    case ESP_RST_WDT: s = "WDT"; break;
+    case ESP_RST_DEEPSLEEP: s = "DEEPSLEEP"; break;
+    case ESP_RST_BROWNOUT: s = "BROWNOUT"; break;
+    case ESP_RST_SDIO: s = "SDIO"; break;
+  }
+  Serial.printf("Reset reason: %s (%d)\n", s, (int)r);
+}
+
 void setup()
 {
+  // start serial as early as possible to capture reset messages
+  Serial.begin(115200);
+  delay(100);
+  printResetReason();
+
+  Serial.println("== PALE BOOT ==");
+
   // Turn off peripherals to gain memory (?do they release properly)
  esp_bt_controller_deinit();
  esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
  esp_wifi_set_mode(WIFI_MODE_NULL);
 
- Serial.begin(115200);
-
  Serial.printf("PALE Emulator Pete Todd 2017\n");
 
-
 #ifdef SD_ENABLED
-    test_sd();
+  test_sd();
 #endif
 
   pinMode(SPEAKER_PIN,OUTPUT);
@@ -223,8 +247,7 @@ void setup()
   //we need double buffering for smooth animations
   vga.setFrameBufferCount(1);
   //initializing i2s vga (with only one framebuffer)
-//  vga.init(vga.MODE320x240.custom(256, 248), redPin, greenPin, bluePin, hsyncPin, vsyncPin);
-  vga.init(vga.MODE400x300.custom(256, 248), redPin, greenPin, bluePin, hsyncPin, vsyncPin);
+  vga.init(vga.MODE320x240.custom(256, 248), redPin, greenPin, bluePin, hsyncPin, vsyncPin);
   
   kb_begin();
 
@@ -272,7 +295,7 @@ void setup()
   Serial.print("Setup: MAIN Executing on core ");
   Serial.println(xPortGetCoreID());
   Serial.print("Free Heap: ");
-  Serial.println(system_get_free_heap_size());
+  Serial.println(esp_get_free_heap_size());
   Serial.print("vga free memory: ");
   Serial.println((int)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
  
@@ -309,9 +332,16 @@ void videoTask( void * parameter )
         for(int col = 0;col < 32;col++)  
         {
           uint16_t bytaddr =  lin * 32 + col;  //startlinebyteaddr +
-          byte redbyte = bank2[bytaddr + 0x2000];
-          byte bluebyte = bank2[bytaddr];
-          byte greenbyte = bank3[bytaddr + 0x2000];
+          byte redbyte = 0;
+          byte bluebyte = 0;
+          byte greenbyte = 0;
+          if (bank2 != NULL) {
+            redbyte = bank2[bytaddr + 0x2000];
+            bluebyte = bank2[bytaddr];
+          }
+          if (bank3 != NULL) {
+            greenbyte = bank3[bytaddr + 0x2000];
+          }
           for(int bb = 0;bb < 8;bb++)
           {
             char dored = 0;
@@ -375,6 +405,14 @@ unsigned long gb_tickerTime;
 
 void loop() 
 { 
+#ifdef DEBUG
+    static unsigned long lastBeat = 0;
+    if ((millis() - lastBeat) > 5000) {
+      lastBeat = millis();
+      Serial.print("HEARTBEAT freeHeap=");
+      Serial.println(esp_get_free_heap_size());
+    }
+#endif
 #ifdef USE_FRAMESYNC
      xSemaphoreTake( xMutex, portMAX_DELAY );
 #endif 
@@ -516,7 +554,7 @@ void do_keyboard()
     {
       keymap[KEY_F3] = 1;
       Serial.print("Free Heap: ");
-      Serial.println(system_get_free_heap_size());
+  Serial.println(esp_get_free_heap_size());
       Serial.print("vga free memory: ");
       Serial.println((int)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
       Serial.print("Total heap: ");

@@ -4,7 +4,7 @@
 
 #include "lynxConfig.h"
 
-#include "Z80.h"
+#include "z80.h"
 #include "LynxRom.h"
 #include "hardware.h"
 
@@ -123,24 +123,31 @@ byte Z80_RDMEM(uint16_t A)
 
   if((bank_latch & 0x20) == 0x00)  // BANK 1  user ram
   {
-    return bank1[A];
+    if (bank1 != NULL) return bank1[A];
+    return 0xff;
   }
 
   if((bank_latch & 0x40) == 0x40)   // BANK 2 video 
   {
     if((video_latch & 0x04) == 0x00)
     {
-        if(A<0x4000 || (A >= 0x8000 && A < 0xc000))
-          return bank2[A % 0x2000];        // mirror
-        else //if((A>=0x4000 && A<0x8000) || A >=0xc000)
-          return bank2[0x2000+(A % 0x2000)];       // BLUE RED
+        if (bank2 != NULL) {
+            if(A<0x4000 || (A >= 0x8000 && A < 0xc000))
+              return bank2[A % 0x2000];        // mirror
+            else //if((A>=0x4000 && A<0x8000) || A >=0xc000)
+              return bank2[0x2000+(A % 0x2000)];       // BLUE RED
+        }
+        return 0xff;
     }
     if((video_latch & 0x08) == 0x00)
     {
-        if(A<0x4000 || (A >= 0x8000 && A < 0xc000))
-          return bank3[A % 0x2000];        // mirror
-        else //if((A>=0x4000 && A<0x8000) || A >=0xc000)
-          return bank3[0x2000+(A % 0x2000)];       // GREEN  ALTGREEN
+        if (bank3 != NULL) {
+            if(A<0x4000 || (A >= 0x8000 && A < 0xc000))
+              return bank3[A % 0x2000];        // mirror
+            else //if((A>=0x4000 && A<0x8000) || A >=0xc000)
+              return bank3[0x2000+(A % 0x2000)];       // GREEN  ALTGREEN
+        }
+        return 0xff;
     }
   }
  
@@ -151,16 +158,18 @@ void Z80_WRMEM(uint16_t A,byte V)
 {
     if((bank_latch & 0x01)==0)
     {      
-        bank1[A]=V;
+        if (bank1 != NULL) bank1[A]=V;
     }
     if((bank_latch & 0x02)==0x02)
     {
       if ((video_latch & 0x04)==0) 
       {
-        if(A<0x4000 || (A >= 0x8000 && A < 0xc000))
-          bank2[A % 0x2000]=V;        // mirror
-        else //if((A>=0x4000 && A<0x8000) || A >=0xc000)
-          bank2[0x2000+(A % 0x2000)]=V;       // BLUE RED
+        if (bank2 != NULL) {
+            if(A<0x4000 || (A >= 0x8000 && A < 0xc000))
+              bank2[A % 0x2000]=V;        // mirror
+            else //if((A>=0x4000 && A<0x8000) || A >=0xc000)
+              bank2[0x2000+(A % 0x2000)]=V;       // BLUE RED
+        }
  
       }
     }
@@ -168,10 +177,12 @@ void Z80_WRMEM(uint16_t A,byte V)
     {
       if ((video_latch & 0x08)==0) 
       {
-       if(A<0x4000 || (A >= 0x8000 && A < 0xc000))
-          bank3[A % 0x2000]=V;        // mirror
-        else //if((A>=0x4000 && A<0x8000) || A >=0xc000)
-         bank3[0x2000+(A % 0x2000)]=V;       //AGREEN  GREEN
+       if (bank3 != NULL) {
+         if(A<0x4000 || (A >= 0x8000 && A < 0xc000))
+            bank3[A % 0x2000]=V;        // mirror
+         else //if((A>=0x4000 && A<0x8000) || A >=0xc000)
+          bank3[0x2000+(A % 0x2000)]=V;       //AGREEN  GREEN
+       }
       }
     }
 }
