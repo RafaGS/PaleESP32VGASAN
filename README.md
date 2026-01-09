@@ -3,6 +3,8 @@ PaleESP32VGA con core de Jose Sanchez adaptadado al ESP32 3.3.0 de Arduino.
 
 Descripción e instalación en: [https://minibots.wordpress.com/2025/10/05/emulador-de-camputers-lynx-96-con-lilygo-ttgo-vga32/]
 
+Más sobre retroinformática aquí: [https://minibots.wordpress.com/retroinformatica/]
+
 Cambios: 
 1. PaleESP32VGASAN.ino
 - Añadido #include <esp_system.h> y función printResetReason() que imprime la causa del reset.
